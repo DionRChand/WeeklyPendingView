@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timesheet Status Board — Chandler Personnel</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f4f1;
+  --surface: #ffffff;
+  --surface2: #f0efe9;
+  --border: #e2e0d8;
+  --border2: #cccab8;
+  --text: #1a1a18;
+  --text2: #6b6960;
+  --text3: #9b9890;
+  --purple: #5b4fcf;
+  --purple-bg: #eeecfc;
+  --purple-text: #3730a3;
+  --green: #2d7d5a;
+  --green-bg: #e8f5ee;
+  --green-text: #1a5c3f;
+  --amber: #b45309;
+  --amber-bg: #fef3c7;
+  --amber-text: #92400e;
+  --red: #dc2626;
+  --red-bg: #fee2e2;
+  --red-text: #991b1b;
+  --blue: #1d4ed8;
+  --blue-bg: #eff6ff;
+  --blue-text: #1e40af;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+
+/* ── FULL APP LAYOUT ── */
+.app-shell { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 100; }
+.main { margin-left: 220px; flex: 1; padding: 32px; max-width: 960px; }
+
+.sidebar-logo { padding: 24px 20px 20px; border-bottom: 1px solid var(--border); }
+.sidebar-logo h1 { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.sidebar-logo p { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.nav { padding: 12px 10px; flex: 1; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm); font-size: 13px; color: var(--text2); transition: all 0.15s; margin-bottom: 2px; border: none; background: none; width: 100%; text-align: left; font-family: 'DM Sans', sans-serif; cursor: pointer; }
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: var(--purple-bg); color: var(--purple-text); font-weight: 500; }
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+.sidebar-footer { padding: 16px; border-top: 1px solid var(--border); }
+.ro-badge { display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: var(--surface2); border-radius: var(--radius-sm); font-size: 11px; color: var(--text3); }
+.ro-badge svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+.sync-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 12px; color: var(--text2); }
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.sync-dot.syncing { background: var(--amber); animation: pulse 1s infinite; }
+.sync-dot.error   { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.section { display: none; }
+.section.active { display: block; }
+.section-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.section-sub   { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.stat-num   { font-size: 28px; font-weight: 600; line-height: 1; font-family: 'DM Mono', monospace; }
+.stat-label { font-size: 11px; color: var(--text3); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.btn    { padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; color: var(--text); transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--surface2); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-primary { background: var(--text); color: var(--surface); border-color: var(--text); }
+.btn-primary:hover { opacity: 0.85; }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.badge-rcvd { background: var(--green-bg);  color: var(--green-text); }
+.badge-proc { background: var(--purple-bg); color: var(--purple-text); }
+.badge-pend { background: var(--red-bg);    color: var(--red-text); }
+.badge-sup  { background: var(--blue-bg);   color: var(--blue-text); }
+.badge-man  { background: var(--amber-bg);  color: var(--amber-text); }
+
+.filter-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.filter-row select, .filter-row input[type=text] { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 13px; font-family: 'DM Sans', sans-serif; }
+.filter-row input[type=text] { flex: 1; min-width: 160px; }
+
+.tbl-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; color: var(--text3); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.05em; background: var(--surface2); white-space: nowrap; }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr.row-done td { opacity: 0.42; }
+tr:not(.row-done):hover td { background: var(--surface2); }
+
+.progress-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 20px; }
+.progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 12px; color: var(--text2); font-weight: 500; }
+.progress-track  { height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; display: flex; }
+.progress-rcvd   { height: 100%; background: var(--green);  transition: width 0.5s ease; }
+.progress-proc   { height: 100%; background: var(--purple); transition: width 0.5s ease; }
+.progress-legend { display: flex; gap: 16px; margin-top: 8px; }
+.legend-item     { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text3); }
+.legend-dot      { width: 8px; height: 8px; border-radius: 2px; }
+
+.email-chip { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text2); background: var(--surface2); padding: 1px 7px; border-radius: 4px; display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 1px 0; }
+
+.empty { text-align: center; padding: 48px 24px; color: var(--text3); font-size: 13px; }
+.empty svg { width: 36px; height: 36px; margin: 0 auto 10px; opacity: 0.4; display: block; }
+
+.contacts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 12px; }
+.contact-card  { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+.contact-name  { font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+.contact-row   { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 5px; font-size: 12px; }
+.contact-row:last-child { margin-bottom: 0; }
+.contact-type  { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); padding-top: 1px; min-width: 28px; }
+
+.toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: white; padding: 12px 20px; border-radius: var(--radius-sm); font-size: 13px; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* ── TEAMS BANNER MODE ── */
+body.teams-mode { background: var(--bg); }
+.teams-banner { display: none; }
+body.teams-mode .app-shell  { display: none; }
+body.teams-mode .teams-banner { display: block; }
+
+.tb-wrap { padding: 14px 18px; }
+.tb-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.tb-title { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+.tb-week  { font-size: 12px; color: var(--text2); }
+.tb-sync  { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; display: flex; align-items: center; gap: 5px; }
+.tb-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 10px; }
+.tb-stat  { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.tb-num   { font-size: 22px; font-weight: 600; font-family: 'DM Mono', monospace; line-height: 1; }
+.tb-lbl   { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+.tb-progress { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 10px; }
+.tb-prog-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); margin-bottom: 6px; }
+.tb-prog-track { height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; display: flex; }
+.tb-prog-rcvd  { height: 100%; background: var(--green); transition: width 0.5s; }
+.tb-prog-proc  { height: 100%; background: var(--purple); transition: width 0.5s; }
+.tb-footer { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text3); flex-wrap: wrap; gap: 6px; }
+.tb-footer a { color: var(--purple-text); text-decoration: none; font-weight: 500; }
+.tb-footer a:hover { text-decoration: underline; }
+
+/* ── SHARE MODAL ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 500; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border-radius: var(--radius); padding: 28px; width: 100%; max-width: 520px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); margin: 16px; }
+.modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.modal p  { font-size: 13px; color: var(--text2); margin-bottom: 20px; line-height: 1.6; }
+.step     { display: flex; gap: 12px; margin-bottom: 16px; align-items: flex-start; }
+.step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--purple-bg); color: var(--purple-text); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.step-body { font-size: 13px; color: var(--text2); line-height: 1.55; }
+.step-body strong { color: var(--text); }
+.url-box  { display: flex; gap: 6px; margin-bottom: 20px; }
+.url-box input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: 'DM Mono', monospace; font-size: 12px; background: var(--surface2); color: var(--text2); }
+.divider  { height: 1px; background: var(--border); margin: 20px 0; }
+.mode-toggle { display: flex; gap: 8px; margin-bottom: 20px; }
+.mode-pill { flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; font-weight: 500; text-align: center; cursor: pointer; background: none; font-family: 'DM Sans', sans-serif; color: var(--text2); }
+.mode-pill.active { border-color: var(--purple); background: var(--purple-bg); color: var(--purple-text); }
+.instruction-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; font-size: 12px; color: var(--text2); line-height: 1.7; }
+.instruction-box ol { padding-left: 18px; }
+.instruction-box li { margin-bottom: 4px; }
+.instruction-box strong { color: var(--text); }
+.instruction-box code { font-family: 'DM Mono', monospace; background: var(--border); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+
+@media(max-width:680px){
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 16px; }
+  .stats-grid { grid-template-columns: repeat(2,1fr); }
+  th.hide-sm, td.hide-sm { display: none; }
+  .tb-stats { grid-template-columns: repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     TEAMS BANNER MODE  (shown when ?mode=banner in URL)
+═══════════════════════════════════════════════════════════ -->
+<div class="teams-banner">
+  <div class="tb-wrap">
+    <div class="tb-header">
+      <div>
+        <div class="tb-title">Timesheet Status Board</div>
+        <div class="tb-week" id="tb-week">Loading…</div>
+      </div>
+      <div class="tb-sync">
+        <div class="sync-dot syncing" id="tb-dot"></div>
+        <span id="tb-sync">Connecting…</span>
+      </div>
+    </div>
+
+    <div class="tb-stats">
+      <div class="tb-stat"><div class="tb-num" id="tb-total">—</div><div class="tb-lbl">Total</div></div>
+      <div class="tb-stat"><div class="tb-num" id="tb-pending" style="color:var(--red)">—</div><div class="tb-lbl">Pending</div></div>
+      <div class="tb-stat"><div class="tb-num" id="tb-rcvd" style="color:var(--green)">—</div><div class="tb-lbl">Received</div></div>
+      <div class="tb-stat"><div class="tb-num" id="tb-proc" style="color:var(--purple)">—</div><div class="tb-lbl">Processed</div></div>
+    </div>
+
+    <div class="tb-progress">
+      <div class="tb-prog-label">
+        <span>Progress</span>
+        <span id="tb-pct" style="font-family:'DM Mono',monospace;color:var(--purple-text)">0%</span>
+      </div>
+      <div class="tb-prog-track">
+        <div class="tb-prog-rcvd" id="tb-prog-rcvd" style="width:0%"></div>
+        <div class="tb-prog-proc" id="tb-prog-proc" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="tb-footer">
+      <div style="display:flex;gap:10px">
+        <div style="display:flex;align-items:center;gap:4px"><div class="legend-dot" style="width:8px;height:8px;border-radius:2px;background:var(--green);display:inline-block"></div><span style="font-size:11px;color:var(--text3)">Received</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div class="legend-dot" style="width:8px;height:8px;border-radius:2px;background:var(--purple);display:inline-block"></div><span style="font-size:11px;color:var(--text3)">Processed</span></div>
+      </div>
+      <a href="javascript:void(0)" onclick="exitBannerMode()">View full board →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     FULL APP
+═══════════════════════════════════════════════════════════ -->
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h1>Client Tracker</h1>
+      <p id="weekLabel">Status Board</p>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" id="nav-timesheets" onclick="showSection('timesheets',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Timesheet Status
+      </button>
+      <button class="nav-item" id="nav-contacts" onclick="showSection('contacts',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        Contacts
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="ro-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        Read-only view
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="sync-bar">
+      <div class="sync-dot syncing" id="syncDot"></div>
+      <span id="syncMsg">Connecting to cloud…</span>
+      <button class="btn btn-sm" onclick="loadAndRender()" style="margin-left:auto">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+      <button class="btn btn-sm" onclick="openShareModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Share in Teams
+      </button>
+    </div>
+
+    <!-- TIMESHEETS -->
+    <div class="section active" id="sec-timesheets">
+      <div class="section-title">Timesheet Status</div>
+      <div class="section-sub">Live view of received and processed timesheets. Auto-refreshes every 30 s.</div>
+
+      <div class="filter-row">
+        <select id="weekSel" onchange="renderTimesheets()"><option value="">Select week ending…</option></select>
+        <select id="filterType" onchange="renderTimesheets()">
+          <option value="">All types</option>
+          <option value="Supervisor">Supervisor portal</option>
+          <option value="Manual">Manual</option>
+        </select>
+        <select id="filterStatus" onchange="renderTimesheets()">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="received">Received</option>
+          <option value="processed">Processed</option>
+        </select>
+        <input type="text" id="searchInput" placeholder="Search client or position…" oninput="renderTimesheets()">
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total</div></div>
+        <div class="stat"><div class="stat-num" id="statPending" style="color:var(--red)">—</div><div class="stat-label">Pending</div></div>
+        <div class="stat"><div class="stat-num" id="statRcvd" style="color:var(--green)">—</div><div class="stat-label">Received</div></div>
+        <div class="stat"><div class="stat-num" id="statProc" style="color:var(--purple)">—</div><div class="stat-label">Processed</div></div>
+      </div>
+
+      <div class="progress-card" id="progressCard" style="display:none">
+        <div class="progress-header">
+          <span>Week completion</span>
+          <span id="progressPct" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--purple-text)">0% processed</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-rcvd" id="progRcvd" style="width:0%"></div>
+          <div class="progress-proc" id="progProc" style="width:0%"></div>
+        </div>
+        <div class="progress-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Received</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Processed</div>
+        </div>
+      </div>
+
+      <div id="tableWrap">
+        <div class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <p>Loading data…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTACTS -->
+    <div class="section" id="sec-contacts">
+      <div class="section-title">Contacts</div>
+      <div class="section-sub">Client email addresses used for timesheet reminders.</div>
+      <div class="filter-row">
+        <input type="text" id="contactSearch" placeholder="Search clients…" oninput="renderContacts()" style="max-width:300px">
+      </div>
+      <div id="contactsWrap"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SHARE MODAL ════════════════════════════════════════ -->
+<div class="modal-overlay" id="shareModal" onclick="if(event.target===this)closeShareModal()">
+  <div class="modal">
+    <h2>Share in Microsoft Teams</h2>
+    <p>Pin this board as a live tab in any Teams channel — your team will see the counts update in real time without needing to log in.</p>
+
+    <div class="mode-toggle">
+      <button class="mode-pill active" id="pill-tab" onclick="switchShareMode('tab')">📌 Website Tab (recommended)</button>
+      <button class="mode-pill" id="pill-banner" onclick="switchShareMode('banner')">🔲 Compact Banner</button>
+    </div>
+
+    <div id="share-tab-instructions" class="instruction-box">
+      <ol>
+        <li>In Teams, open the channel you want to share this board in.</li>
+        <li>Click the <strong>+</strong> (Add a tab) button at the top of the channel.</li>
+        <li>Search for and select <strong>Website</strong>.</li>
+        <li>Paste this URL into the Website field:</li>
+      </ol>
+      <div class="url-box" style="margin-top:10px;margin-bottom:0">
+        <input type="text" id="shareUrlFull" readonly onclick="this.select()">
+        <button class="btn btn-sm btn-primary" onclick="copyUrl('full')">Copy</button>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text3)">✅ Auto-selects the closest week · ✅ Refreshes live every 30 s · ✅ No login required</div>
+    </div>
+
+    <div id="share-banner-instructions" class="instruction-box" style="display:none">
+      <p style="margin-bottom:10px;font-size:12px">The compact banner shows just the live counts — great for a narrow tab or as a quick-glance panel.</p>
+      <ol>
+        <li>In Teams, click <strong>+</strong> → <strong>Website</strong> tab.</li>
+        <li>Paste this URL (includes <code>?mode=banner</code>):</li>
+      </ol>
+      <div class="url-box" style="margin-top:10px;margin-bottom:0">
+        <input type="text" id="shareUrlBanner" readonly onclick="this.select()">
+        <button class="btn btn-sm btn-primary" onclick="copyUrl('banner')">Copy</button>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text3)">✅ Minimal view · ✅ Click "View full board →" to expand · ✅ Auto-refreshes every 30 s</div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-sm" onclick="closeShareModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const JSONBIN_ID  = '6a17931621f9ee59d2936e82';
+const JSONBIN_KEY = '$2a$10$mIWvrjK0rAtiw8nwF2KxWun7M9cjS1f/hLts1/O3P42j0CySN/vYy';
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}/latest`;
+
+let appData = null;
+
+// ─── DETECT BANNER MODE ───────────────────────────────────────────────────────
+const isBanner = new URLSearchParams(location.search).get('mode') === 'banner';
+if (isBanner) document.body.classList.add('teams-mode');
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function fmtDate(d) {
+  try { return new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  catch(e) { return d; }
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+function setSyncStatus(status, msg) {
+  ['syncDot','tb-dot'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'sync-dot' + (status==='syncing'?' syncing':status==='error'?' error':'');
+  });
+  const sm = document.getElementById('syncMsg');
+  const ts = document.getElementById('tb-sync');
+  if (sm) sm.textContent = msg;
+  if (ts) ts.textContent = msg;
+}
+
+// ─── CLOSEST WEEK LOGIC ───────────────────────────────────────────────────────
+// Picks the uploaded week whose date is closest to today
+function getClosestWeek(uploadedWeeks) {
+  if (!uploadedWeeks || !uploadedWeeks.length) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let closest = null, minDiff = Infinity;
+  uploadedWeeks.forEach(w => {
+    const d = new Date(w + 'T00:00:00');
+    const diff = Math.abs(d - today);
+    if (diff < minDiff) { minDiff = diff; closest = w; }
+  });
+  return closest;
+}
+
+// ─── FETCH ────────────────────────────────────────────────────────────────────
+async function loadAndRender() {
+  setSyncStatus('syncing', 'Loading from cloud…');
+  try {
+    const res = await fetch(JSONBIN_URL, { headers: { 'X-Master-Key': JSONBIN_KEY } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    const data = json.record || {};
+    appData = {
+      weeks:           data.weeks || {},
+      timesheetStatus: data.timesheetStatus || {},
+      uploadedWeeks:   data.uploadedWeeks || [],
+      contacts:        data.contacts || []
+    };
+
+    if (!isBanner) {
+      // Populate week dropdown — keep current selection if valid
+      const sel = document.getElementById('weekSel');
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">Select week ending…</option>';
+      appData.uploadedWeeks.forEach(w => {
+        const o = document.createElement('option');
+        o.value = w; o.textContent = 'Week ending ' + fmtDate(w);
+        sel.appendChild(o);
+      });
+      // Auto-select closest week on first load, keep selection on refresh
+      if (appData.uploadedWeeks.includes(prev)) {
+        sel.value = prev;
+      } else {
+        const closest = getClosestWeek(appData.uploadedWeeks);
+        if (closest) sel.value = closest;
+      }
+
+      const closest = getClosestWeek(appData.uploadedWeeks);
+      if (closest)
+        document.getElementById('weekLabel').textContent = 'Latest: ' + fmtDate(closest);
+    }
+
+    setSyncStatus('ok', 'Synced · ' + new Date().toLocaleTimeString());
+    if (isBanner) renderBanner();
+    else { renderTimesheets(); renderContacts(); }
+  } catch(e) {
+    setSyncStatus('error', 'Load error — ' + e.message);
+  }
+}
+
+// ─── BANNER RENDER ────────────────────────────────────────────────────────────
+function renderBanner() {
+  if (!appData) return;
+  const week = getClosestWeek(appData.uploadedWeeks);
+  document.getElementById('tb-week').textContent = week ? 'Week ending ' + fmtDate(week) : 'No data';
+  if (!week || !appData.weeks[week]) return;
+
+  const allRows = appData.weeks[week].rows || [];
+  const ts = appData.timesheetStatus[week] || {};
+  let total=0, rcvd=0, proc=0, pend=0;
+  allRows.forEach((r,i) => {
+    total++;
+    const rk = r.jobcodeKey + '||' + i;
+    const rv = !!(ts[rk]&&ts[rk].received);
+    const pr = !!(ts[rk]&&ts[rk].processed);
+    if (pr) proc++; else if (rv) rcvd++; else pend++;
+  });
+  document.getElementById('tb-total').textContent   = total;
+  document.getElementById('tb-pending').textContent = pend;
+  document.getElementById('tb-rcvd').textContent    = rcvd;
+  document.getElementById('tb-proc').textContent    = proc;
+  const rcvdPct = total ? Math.round((rcvd/total)*100) : 0;
+  const procPct = total ? Math.round((proc/total)*100) : 0;
+  document.getElementById('tb-pct').textContent = procPct + '% processed';
+  document.getElementById('tb-prog-rcvd').style.width = Math.max(0, rcvdPct - procPct) + '%';
+  document.getElementById('tb-prog-proc').style.width = procPct + '%';
+}
+
+function exitBannerMode() {
+  document.body.classList.remove('teams-mode');
+  const url = new URL(location.href);
+  url.searchParams.delete('mode');
+  history.replaceState({}, '', url);
+  loadAndRender();
+}
+
+// ─── FULL APP SECTIONS ────────────────────────────────────────────────────────
+function showSection(name, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+function renderTimesheets() {
+  if (!appData) return;
+  const week    = document.getElementById('weekSel').value;
+  const typeF   = document.getElementById('filterType').value;
+  const statusF = document.getElementById('filterStatus').value;
+  const search  = (document.getElementById('searchInput').value || '').toLowerCase();
+
+  if (!week || !appData.weeks[week]) {
+    document.getElementById('progressCard').style.display = 'none';
+    ['statTotal','statPending','statRcvd','statProc'].forEach(id => document.getElementById(id).textContent = '—');
+    document.getElementById('tableWrap').innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><p>Select a week to view timesheets.</p></div>`;
+    return;
+  }
+
+  const allRows   = appData.weeks[week].rows || [];
+  const ts        = appData.timesheetStatus[week] || {};
+  const supEmails = appData.weeks[week].supervisorEmails || {};
+  const manEmails = appData.weeks[week].manualEmails || {};
+
+  const rowsWS = allRows.map((r,i) => {
+    const rk = r.jobcodeKey+'||'+i;
+    const rv = !!(ts[rk]&&ts[rk].received);
+    const pr = !!(ts[rk]&&ts[rk].processed);
+    return { ...r, rk, received:rv, processed:pr, status: pr?'processed':rv?'received':'pending' };
+  });
+
+  const total   = rowsWS.length;
+  const rcvdCnt = rowsWS.filter(r=>r.received).length;
+  const procCnt = rowsWS.filter(r=>r.processed).length;
+  const pendCnt = rowsWS.filter(r=>r.status==='pending').length;
+  document.getElementById('statTotal').textContent   = total;
+  document.getElementById('statPending').textContent = pendCnt;
+  document.getElementById('statRcvd').textContent    = rcvdCnt;
+  document.getElementById('statProc').textContent    = procCnt;
+
+  const rcvdPct = total ? ((rcvdCnt/total)*100).toFixed(0) : 0;
+  const procPct = total ? ((procCnt/total)*100).toFixed(0) : 0;
+  document.getElementById('progressCard').style.display = '';
+  document.getElementById('progressPct').textContent = procPct + '% processed';
+  document.getElementById('progRcvd').style.width = Math.max(0, rcvdPct - procPct) + '%';
+  document.getElementById('progProc').style.width = procPct + '%';
+
+  let rows = rowsWS;
+  if (typeF)   rows = rows.filter(r=>r.type===typeF);
+  if (statusF) rows = rows.filter(r=>r.status===statusF);
+  if (search)  rows = rows.filter(r=>r.client.toLowerCase().includes(search)||r.position.toLowerCase().includes(search));
+
+  if (!rows.length) {
+    document.getElementById('tableWrap').innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="20 6 9 17 4 12"/></svg><p>No records match your filter.</p></div>`;
+    return;
+  }
+
+  const contacts = appData.contacts || [];
+  function getEmail(client, type) {
+    const c = contacts.find(x => x.client&&x.client.trim().toLowerCase()===(client||'').trim().toLowerCase());
+    if (c) return type==='Supervisor'?(c.supEmail||''):(c.manEmail||'');
+    const ck=(client||'').trim().toUpperCase();
+    return type==='Supervisor'?(supEmails[ck]||''):(manEmails[ck]||'');
+  }
+
+  let html = `<div class="tbl-wrap"><table>
+    <thead><tr>
+      <th>Client</th><th>Position</th>
+      <th class="hide-sm">Email</th>
+      <th>Type</th><th>Status</th>
+    </tr></thead><tbody>`;
+
+  rows.forEach(r => {
+    const email = getEmail(r.client, r.type);
+    const emailHtml = email
+      ? email.split(',').map(e=>`<div class="email-chip" title="${esc(e.trim())}">${esc(e.trim())}</div>`).join('')
+      : '<span style="color:var(--text3)">—</span>';
+    const statusBadge =
+      r.status==='processed'?'<span class="badge badge-proc">✓ Processed</span>':
+      r.status==='received' ?'<span class="badge badge-rcvd">Received</span>':
+                             '<span class="badge badge-pend">Pending</span>';
+    const typeBadge = r.type==='Supervisor'
+      ? '<span class="badge badge-sup">Supervisor</span>'
+      : '<span class="badge badge-man">Manual</span>';
+    html += `<tr class="${r.status==='processed'?'row-done':''}">
+      <td style="font-weight:500">${esc(r.client)}</td>
+      <td style="color:var(--text2)">${esc(r.position)}</td>
+      <td class="hide-sm">${emailHtml}</td>
+      <td>${typeBadge}</td>
+      <td>${statusBadge}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('tableWrap').innerHTML = html;
+}
+
+function renderContacts() {
+  if (!appData) return;
+  const search = (document.getElementById('contactSearch').value||'').toLowerCase();
+  let contacts = appData.contacts||[];
+  if (search) contacts = contacts.filter(c=>c.client.toLowerCase().includes(search));
+  if (!contacts.length) {
+    document.getElementById('contactsWrap').innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><p>${search?'No contacts match.':'No contacts saved yet.'}</p></div>`;
+    return;
+  }
+  let html = '<div class="contacts-grid">';
+  contacts.forEach(c => {
+    const sups = (c.supEmail||'').split(',').map(e=>e.trim()).filter(Boolean);
+    const mans = (c.manEmail||'').split(',').map(e=>e.trim()).filter(Boolean);
+    html += `<div class="contact-card">
+      <div class="contact-name">${esc(c.client)}</div>
+      ${sups.length?`<div class="contact-row"><div class="contact-type" style="color:var(--blue-text)">Sup</div><div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${sups.map(e=>esc(e)).join('<br>')}</div></div>`:''}
+      ${mans.length?`<div class="contact-row"><div class="contact-type" style="color:var(--amber-text)">Man</div><div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2)">${mans.map(e=>esc(e)).join('<br>')}</div></div>`:''}
+      ${!sups.length&&!mans.length?'<div style="font-size:12px;color:var(--text3)">No emails on file</div>':''}
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('contactsWrap').innerHTML = html;
+}
+
+// ─── SHARE MODAL ──────────────────────────────────────────────────────────────
+function openShareModal() {
+  const base = location.href.split('?')[0];
+  document.getElementById('shareUrlFull').value   = base;
+  document.getElementById('shareUrlBanner').value = base + '?mode=banner';
+  document.getElementById('shareModal').classList.add('open');
+}
+function closeShareModal() {
+  document.getElementById('shareModal').classList.remove('open');
+}
+function switchShareMode(mode) {
+  document.getElementById('pill-tab').classList.toggle('active', mode==='tab');
+  document.getElementById('pill-banner').classList.toggle('active', mode==='banner');
+  document.getElementById('share-tab-instructions').style.display    = mode==='tab'    ? '' : 'none';
+  document.getElementById('share-banner-instructions').style.display = mode==='banner' ? '' : 'none';
+}
+function copyUrl(which) {
+  const el = document.getElementById(which==='full'?'shareUrlFull':'shareUrlBanner');
+  el.select(); document.execCommand('copy');
+  toast('URL copied to clipboard!');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadAndRender();
+setInterval(loadAndRender, 30000);
+</script>
+</body>
+</html>
